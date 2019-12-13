@@ -36,10 +36,10 @@ iptables -A OUTPUT -d 172.23.0.0/16 -p tcp -m tcp --sport 22 -m state --state ES
 ~~~
 
 ~~~
-root@router-fw:/home/debian# iptables -A INPUT -s 172.22.0.0/16 -p tcp --dport 22 -j ACCEPT
-root@router-fw:/home/debian# iptables -A OUTPUT -d 172.22.0.0/16 -p tcp --sport 22 -j ACCEPT
-root@router-fw:/home/debian# iptables -A INPUT -s 172.23.0.0/16 -p tcp --dport 22 -j ACCEPT
-root@router-fw:/home/debian# iptables -A OUTPUT -d 172.23.0.0/16 -p tcp --sport 22 -j ACCEPT
+root@router-fw:/home/debian# iptables -A INPUT -s 172.22.0.0/16 -p tcp -m tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# iptables -A OUTPUT -d 172.22.0.0/16 -p tcp -m tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# iptables -A INPUT -s 172.23.0.0/16 -p tcp -m tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# iptables -A OUTPUT -d 172.23.0.0/16 -p tcp -m tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
 ~~~
 
 Y se configuran las reglas por defecto:
@@ -64,10 +64,10 @@ iptables -A INPUT -p tcp -i eth2 -s 192.168.200.0/24 --sport 22 -m state --state
 ~~~
 
 ~~~
-root@router-fw:/home/debian# iptables -A OUTPUT -p tcp -o eth1 -d 192.168.100.0/24 --dport 22 -j ACCEPT
-root@router-fw:/home/debian# iptables -A INPUT -p tcp -i eth1 -s 192.168.100.0/24 --sport 22 -j ACCEPT
-root@router-fw:/home/debian# iptables -A OUTPUT -p tcp -o eth2 -d 192.168.200.0/24 --dport 22 -j ACCEPT
-root@router-fw:/home/debian# iptables -A INPUT -p tcp -i eth2 -s 192.168.200.0/24 --sport 22 -j ACCEPT
+root@router-fw:/home/debian# iptables -A OUTPUT -p tcp -o eth1 -d 192.168.100.0/24 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# iptables -A INPUT -p tcp -i eth1 -s 192.168.100.0/24 --sport 22 -m state --state ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# iptables -A OUTPUT -p tcp -o eth2 -d 192.168.200.0/24 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# iptables -A INPUT -p tcp -i eth2 -s 192.168.200.0/24 --sport 22 -m state --state ESTABLISHED -j ACCEPT
 ~~~
 
 
@@ -78,25 +78,23 @@ root@router-fw:/home/debian# iptables -A INPUT -p tcp -i eth2 -s 192.168.200.0/2
 
 Las reglas que hay actualmente son:
 ~~~
-root@router-fw:/home/debian# iptables -L -n --line-numbers
+root@router-fw:/home/debian#  iptables -L -n --line-numbers
 Chain INPUT (policy DROP)
 num  target     prot opt source               destination         
-1    ACCEPT     tcp  --  172.22.0.0/16        0.0.0.0/0            tcp dpt:22
-2    ACCEPT     tcp  --  172.23.0.0/16        0.0.0.0/0            tcp dpt:22
-3    ACCEPT     tcp  --  192.168.100.0/24     0.0.0.0/0            tcp spt:22
-4    ACCEPT     tcp  --  192.168.200.0/24     0.0.0.0/0            tcp spt:22
+1    ACCEPT     tcp  --  172.22.0.0/16        0.0.0.0/0            tcp dpt:22 state NEW,ESTABLISHED
+2    ACCEPT     tcp  --  172.23.0.0/16        0.0.0.0/0            tcp dpt:22 state NEW,ESTABLISHED
+3    ACCEPT     tcp  --  192.168.100.0/24     0.0.0.0/0            tcp spt:22 state ESTABLISHED
+4    ACCEPT     tcp  --  192.168.200.0/24     0.0.0.0/0            tcp spt:22 state ESTABLISHED
 
 Chain FORWARD (policy DROP)
 num  target     prot opt source               destination         
-1    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22 state NEW,ESTABLISHED
-2    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp spt:22 state ESTABLISHED
 
 Chain OUTPUT (policy DROP)
 num  target     prot opt source               destination         
-1    ACCEPT     tcp  --  0.0.0.0/0            172.22.0.0/16        tcp spt:22
-2    ACCEPT     tcp  --  0.0.0.0/0            172.23.0.0/16        tcp spt:22
-3    ACCEPT     tcp  --  0.0.0.0/0            192.168.100.0/24     tcp dpt:22
-4    ACCEPT     tcp  --  0.0.0.0/0            192.168.200.0/24     tcp dpt:22
+1    ACCEPT     tcp  --  0.0.0.0/0            172.22.0.0/16        tcp spt:22 state ESTABLISHED
+2    ACCEPT     tcp  --  0.0.0.0/0            172.23.0.0/16        tcp spt:22 state ESTABLISHED
+3    ACCEPT     tcp  --  0.0.0.0/0            192.168.100.0/24     tcp dpt:22 state NEW,ESTABLISHED
+4    ACCEPT     tcp  --  0.0.0.0/0            192.168.200.0/24     tcp dpt:22 state NEW,ESTABLISHED
 ~~~
 
 Se guardan las reglas:
@@ -131,16 +129,88 @@ Comprobación. Se reinicia la máquina
 ##### 5. El cortafuego debe cumplir al menos estas reglas:
 - La máquina router-fw tiene un servidor ssh escuchando por el puerto 22, pero al acceder desde el exterior habrá que conectar al puerto 2222.
 
-iptables -I OUTPUT -p tcp -s 172.22.0.0/16 --dport 2222 -j ACCEPT
-iptables -I INPUT -p tcp -d 172.22.0.0/16 --sport 2222 -j ACCEPT
+Hay que redirigir el puerto 2222 al 22.
 
-iptables -I OUTPUT -p tcp -s 172.23.0.0/16 --dport 2222 -j ACCEPT
-iptables -I INPUT -p tcp -d 172.23.0.0/16 --sport 2222 -j ACCEPT
+> Además, hay que activar el 'ip_forward'
+~~~
+echo 1 > /proc/sys/net/ipv4/ip_forward
+~~~
+
+Redirección:
+~~~
+iptables -t nat -I PREROUTING -p tcp -s 172.22.0.0/16 --dport 2222 -j REDIRECT --to-ports 22
+~~~
+
+~~~
+root@router-fw:/home/debian# sudo iptables -t nat -I PREROUTING -p tcp --dport 2222 -j REDIRECT --to-ports 22
+~~~
+
+Se configura la regla para que se pueda hacer conexión desde el puerto 2222 desde los rangos adecuados:
+~~~
+iptables -A INPUT -s 172.22.0.0/16 -p tcp -m tcp --dport 2222 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -d 172.22.0.0/16 -p tcp -m tcp --sport 2222 -m state --state ESTABLISHED -j ACCEPT
+iptables -A INPUT -s 172.23.0.0/16 -p tcp -m tcp --dport 2222 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -d 172.23.0.0/16 -p tcp -m tcp --sport 2222 -m state --state ESTABLISHED -j ACCEPT
+~~~
+
+~~~
+root@router-fw:/home/debian# sudo iptables -A INPUT -s 172.22.0.0/16 -p tcp -m tcp --dport 2222 -m state --state NEW,ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# sudo iptables -A OUTPUT -d 172.22.0.0/16 -p tcp -m tcp --sport 2222 -m state --state ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# sudo iptables -A INPUT -s 172.23.0.0/16 -p tcp -m tcp --dport 2222 -m state --state NEW,ESTABLISHED -j ACCEPT
+root@router-fw:/home/debian# sudo iptables -A OUTPUT -d 172.23.0.0/16 -p tcp -m tcp --sport 2222 -m state --state ESTABLISHED -j ACCEPT
+~~~
+
+Se indica qué se redirecciona, en este caso, hacia loopback:
+~~~
+iptables -t nat -A PREROUTING -p tcp -s 172.22.0.0/16 --dport 22 -j DNAT --to-destination 127.0.0.1
+~~~
+
+~~~
+root@router-fw:/home/debian# iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination 127.0.0.1
+~~~
+
+> Comprobación:
+~~~
+paloma@coatlicue:~/DISCO2$ ssh -p 2222 debian@172.22.201.43
+Linux router-fw 4.19.0-6-cloud-amd64 #1 SMP Debian 4.19.67-2+deb10u1 (2019-09-20) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Fri Dec 13 10:58:59 2019 from 172.22.7.88
+debian@router-fw:~$ exit
+logout
+Connection to 172.22.201.43 closed.
+paloma@coatlicue:~/DISCO2$ ssh debian@172.22.201.43
+ssh: connect to host 172.22.201.43 port 22: Connection timed out
+~~~
 
 
-iptables -A OUTPUT -p tcp -o eth1 -d 192.168.100.0/24 --dport 22 -j ACCEPT
+- Desde la LAN y la DMZ se debe permitir la conexión ssh por el puerto 22 a la máquina router-fw.
+Conexión con la lan:
+~~~
+iptables -A INPUT -s 192.168.100.0/24 -p tcp -m tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -d 192.168.100.0/24 -p tcp -m tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+~~~
 
-- Desde la LAN y la DMZ se debe permitir la conexión ssh por el puerto 22 al la máquina router-fw.
+Conexión con la DMZ:
+~~~
+LO MISMO QUE CON LA LAN PERO CON LA DMZ
+~~~
+*
+*
+*
+*
+*
+*
+*
+*
+*
+
+
 - La máquina router-fw debe tener permitido el tráfico para la interfaz loopback.
 - A la máquina router-fw se le puede hacer ping desde la DMZ, pero desde la LAN se le debe rechazar la conexión (REJECT).
 - La máquina router-fw puede hacer ping a la LAN, la DMZ y al exterior.
